@@ -1,0 +1,20 @@
+{
+  "name": "ozon-fbs-logistics-calculator",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --configLoader native",
+    "build": "vite build --configLoader native",
+    "preview": "vite preview",
+    "test:logic": "node --test src/tariffs.test.mjs"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^5.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "vite": "^6.0.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {}
+}
