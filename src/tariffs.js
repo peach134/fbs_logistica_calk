@@ -101,6 +101,20 @@ export function choosePrice(tariff, productPrice) {
   return value <= 300 ? tariff.priceUnder300 : tariff.priceOver300;
 }
 
+export function findUniversalPrice(defaultTariffs, volume, productPrice) {
+  const normalizedProductPrice = parseProductPrice(productPrice);
+  if (normalizedProductPrice === null || !Number.isFinite(volume)) {
+    return null;
+  }
+
+  const defaultTariff = defaultTariffs.find((tariff) => volumeMatches(tariff, volume));
+  if (!defaultTariff) {
+    return null;
+  }
+
+  return choosePrice(defaultTariff, normalizedProductPrice);
+}
+
 function findSheetName(sheetNames, exactName, fallbackNeedle) {
   if (sheetNames.includes(exactName)) {
     return exactName;
@@ -289,12 +303,16 @@ export function calculateLogistics({ tariffs, defaultTariffs, productPrice, volu
       }))
       .filter((tariff) => tariff.price !== null && Number.isFinite(tariff.price));
 
+  const universalPrice = findUniversalPrice(defaultTariffs, volume, normalizedProductPrice);
   const primaryRows = buildRows(
     tariffs.filter((tariff) => normalizeText(tariff.sourceCluster) === normalizeText(sourceCluster)),
   );
 
   const usedDefault = primaryRows.length === 0;
-  const rows = usedDefault ? buildRows(defaultTariffs) : primaryRows;
+  const rows = (usedDefault ? buildRows(defaultTariffs) : primaryRows).map((row) => ({
+    ...row,
+    universalPrice,
+  }));
 
   if (!rows.length) {
     return {
@@ -314,6 +332,7 @@ export function calculateLogistics({ tariffs, defaultTariffs, productPrice, volu
   return {
     status: "ok",
     usedDefault,
+    universalPrice,
     rows,
     stats: {
       min,

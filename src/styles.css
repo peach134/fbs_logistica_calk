@@ -241,10 +241,25 @@ select:focus {
   color: #7d1e16;
 }
 
-.file-name {
+.file-name,
+.tariff-link-note {
   margin: 10px 2px 0;
   color: var(--muted);
   font-size: 14px;
+}
+
+.tariff-link-note {
+  margin-top: 6px;
+}
+
+.tariff-link-note a {
+  color: var(--green);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.tariff-link-note a:hover {
+  text-decoration: underline;
 }
 
 .result-topline {
@@ -340,7 +355,7 @@ select:focus {
 
 table {
   width: 100%;
-  min-width: 720px;
+  min-width: 680px;
   border-collapse: collapse;
 }
 

@@ -24,6 +24,9 @@ const numberFormatter = new Intl.NumberFormat("ru-RU", {
   maximumFractionDigits: 3,
 });
 
+const OZON_TARIFFS_URL =
+  "https://seller-edu.ozon.ru/libra/commissions-tariffs/legal-information/full-actual-commissions?utm_source=Prices&mode=small&collapsed=false&source=faq#2-3-3-логистика";
+
 function formatRuble(value) {
   return rubleFormatter.format(value);
 }
@@ -173,6 +176,13 @@ export default function App() {
         </div>
 
         {fileName ? <p className="file-name">Файл: {fileName}</p> : null}
+        <p className="tariff-link-note">
+          Файл с актуальными тарифами можно скачать на{" "}
+          <a href={OZON_TARIFFS_URL} rel="noreferrer" target="_blank">
+            странице Ozon Seller
+          </a>
+          .
+        </p>
 
         <section className="panel inputs-panel" aria-label="Параметры расчёта">
           <div className="panel-heading">
@@ -282,9 +292,8 @@ export default function App() {
                   <tr>
                     <th>Кластер доставки</th>
                     <th>Объём</th>
-                    <th>До 300 ₽</th>
-                    <th>Свыше 300 ₽</th>
-                    <th>Итоговый тариф</th>
+                    <th>Универсальный тариф</th>
+                    <th>Тариф по направлению</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -292,8 +301,7 @@ export default function App() {
                     <tr key={`${row.destination}-${row.volumeLabel}-${index}`}>
                       <td>{row.destination}</td>
                       <td>{row.volumeLabel}</td>
-                      <td>{row.priceUnder300 === null ? "—" : formatRuble(row.priceUnder300)}</td>
-                      <td>{row.priceOver300 === null ? "—" : formatRuble(row.priceOver300)}</td>
+                      <td>{row.universalPrice === null ? "—" : formatRuble(row.universalPrice)}</td>
                       <td>
                         <strong>{formatRuble(row.price)}</strong>
                       </td>

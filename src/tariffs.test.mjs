@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   calculateLogistics,
   calculateVolumeLiters,
+  findUniversalPrice,
   parseMoney,
   parseProductPrice,
   parseTariffSheets,
@@ -69,6 +70,8 @@ test("parses fixed Ozon sheets and chooses tariff by product price", () => {
   assert.equal(under.usedDefault, false);
   assert.equal(under.stats.min, 100);
   assert.equal(under.stats.max, 120);
+  assert.equal(under.universalPrice, 90);
+  assert.equal(under.rows[0].universalPrice, 90);
 
   const over = calculateLogistics({
     ...parsed,
@@ -79,6 +82,8 @@ test("parses fixed Ozon sheets and chooses tariff by product price", () => {
   assert.equal(over.status, "ok");
   assert.equal(over.stats.min, 250);
   assert.equal(over.stats.max, 280);
+  assert.equal(over.universalPrice, 200);
+  assert.equal(over.rows[0].universalPrice, 200);
 
   const cheap = calculateLogistics({
     ...parsed,
@@ -95,6 +100,35 @@ test("parses fixed Ozon sheets and chooses tariff by product price", () => {
     sourceCluster: "Воронеж",
   });
   assert.equal(expensive.stats.min, 250);
+});
+
+test("finds universal tariff by volume and product price", () => {
+  const defaultTariffs = [
+    {
+      sourceCluster: "Тариф по умолчанию",
+      destination: "Тариф по умолчанию",
+      volumeLabel: "6,001-7 л",
+      volumeMin: 6.001,
+      volumeMax: 7,
+      priceUnder300: 57.95,
+      priceOver300: 99,
+    },
+    {
+      sourceCluster: "Тариф по умолчанию",
+      destination: "Тариф по умолчанию",
+      volumeLabel: "10,001-11 л",
+      volumeMin: 10.001,
+      volumeMax: 11,
+      priceUnder300: 79.3,
+      priceOver300: 102,
+    },
+  ];
+
+  assert.equal(findUniversalPrice(defaultTariffs, 6.5, 222), 57.95);
+  assert.equal(findUniversalPrice(defaultTariffs, 6.5, 2222), 99);
+  assert.equal(findUniversalPrice(defaultTariffs, 10.648, 222), 79.3);
+  assert.equal(findUniversalPrice(defaultTariffs, 10.648, 2222), 102);
+  assert.equal(findUniversalPrice(defaultTariffs, 12, 2222), null);
 });
 
 test("does not calculate when product price is blank", () => {
