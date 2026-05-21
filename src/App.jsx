@@ -26,6 +26,26 @@ const numberFormatter = new Intl.NumberFormat("ru-RU", {
 
 const OZON_TARIFFS_URL =
   "https://seller-edu.ozon.ru/libra/commissions-tariffs/legal-information/full-actual-commissions?utm_source=Prices&mode=small&collapsed=false&source=faq#2-3-3-логистика";
+const MM_NOTICE_KEY = "ozon-mm-notice-v1";
+const MM_NOTICE_COOKIE = `${MM_NOTICE_KEY}=seen`;
+
+function shouldShowMillimeterNotice() {
+  try {
+    return window.localStorage.getItem(MM_NOTICE_KEY) !== "seen";
+  } catch {
+    return !document.cookie.split("; ").includes(MM_NOTICE_COOKIE);
+  }
+}
+
+function rememberMillimeterNotice() {
+  try {
+    window.localStorage.setItem(MM_NOTICE_KEY, "seen");
+  } catch {
+    // The cookie below keeps the notice one-time even if the browser blocks localStorage.
+  }
+
+  document.cookie = `${MM_NOTICE_COOKIE}; max-age=31536000; path=/; SameSite=Lax`;
+}
 
 function formatRuble(value) {
   return rubleFormatter.format(value);
@@ -85,6 +105,7 @@ export default function App() {
   const [parsed, setParsed] = useState(null);
   const [selectedCluster, setSelectedCluster] = useState("");
   const [fileName, setFileName] = useState("");
+  const [showMillimeterNotice, setShowMillimeterNotice] = useState(shouldShowMillimeterNotice);
   const [status, setStatus] = useState({
     tone: "muted",
     text: "Загрузите XLSX-файл с тарифами Ozon.",
@@ -117,6 +138,11 @@ export default function App() {
 
   function updateInput(name, value) {
     setInputs((current) => ({ ...current, [name]: value }));
+  }
+
+  function closeMillimeterNotice() {
+    rememberMillimeterNotice();
+    setShowMillimeterNotice(false);
   }
 
   async function handleFileChange(event) {
@@ -157,6 +183,26 @@ export default function App() {
 
   return (
     <main className="app-shell">
+      {showMillimeterNotice ? (
+        <div className="modal-backdrop" role="presentation">
+          <section
+            aria-describedby="millimeter-notice-text"
+            aria-labelledby="millimeter-notice-title"
+            className="update-modal"
+            role="dialog"
+          >
+            <p className="modal-kicker">Обновление калькулятора</p>
+            <h2 id="millimeter-notice-title">Габариты теперь в миллиметрах</h2>
+            <p id="millimeter-notice-text">
+              Вводите длину, ширину и высоту в мм — как в карточке товара Ozon. Объём считается без округления,
+              поэтому разница даже в 1 мм может повлиять на тарифный диапазон.
+            </p>
+            <button className="modal-button" onClick={closeMillimeterNotice} type="button">
+              Понятно
+            </button>
+          </section>
+        </div>
+      ) : null}
       <section className="workspace">
         <div className="intro">
           <div>

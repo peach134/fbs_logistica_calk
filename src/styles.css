@@ -49,6 +49,64 @@ button {
   margin: 0 auto;
 }
 
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(12, 25, 20, 0.48);
+  backdrop-filter: blur(4px);
+}
+
+.update-modal {
+  width: min(460px, 100%);
+  padding: 26px;
+  border: 1px solid #c8ded5;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 28px 80px rgba(12, 25, 20, 0.28);
+}
+
+.modal-kicker {
+  margin-bottom: 8px;
+  color: var(--green);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.update-modal h2 {
+  margin-bottom: 12px;
+  color: var(--ink);
+  font-size: 28px;
+  line-height: 1.12;
+}
+
+.update-modal p {
+  color: var(--muted);
+}
+
+.modal-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  width: 100%;
+  margin-top: 8px;
+  border: 0;
+  border-radius: 8px;
+  color: #ffffff;
+  background: var(--green);
+  font-weight: 800;
+}
+
+.modal-button:hover {
+  background: var(--green-dark);
+}
+
 .intro {
   display: flex;
   align-items: center;
@@ -418,5 +476,13 @@ tr:last-child td {
 
   .stat-card {
     min-height: 86px;
+  }
+
+  .update-modal {
+    padding: 20px;
+  }
+
+  .update-modal h2 {
+    font-size: 24px;
   }
 }
