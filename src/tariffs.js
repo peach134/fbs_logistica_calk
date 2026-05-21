@@ -276,7 +276,7 @@ export function calculateVolumeLiters({ length, width, height }) {
     return null;
   }
 
-  return (values[0] * values[1] * values[2]) / 1000;
+  return (values[0] * values[1] * values[2]) / 1_000_000;
 }
 
 export function calculateLogistics({ tariffs, defaultTariffs, productPrice, volume, sourceCluster }) {

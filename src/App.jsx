@@ -201,22 +201,22 @@ export default function App() {
             <Field
               label="Длина"
               onChange={(value) => updateInput("length", value)}
-              placeholder="10"
-              suffix="см"
+              placeholder="220"
+              suffix="мм"
               value={inputs.length}
             />
             <Field
               label="Ширина"
               onChange={(value) => updateInput("width", value)}
-              placeholder="10"
-              suffix="см"
+              placeholder="220"
+              suffix="мм"
               value={inputs.width}
             />
             <Field
               label="Высота"
               onChange={(value) => updateInput("height", value)}
-              placeholder="60"
-              suffix="см"
+              placeholder="220"
+              suffix="мм"
               value={inputs.height}
             />
           </div>

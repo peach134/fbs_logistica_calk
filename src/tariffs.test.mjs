@@ -31,9 +31,10 @@ test("matches volume by inclusive range bounds", () => {
   assert.equal(volumeMatches(parseVolumeRange("От 800,001 л"), 800.5), true);
 });
 
-test("calculates volume in liters from centimeters", () => {
-  assert.equal(calculateVolumeLiters({ length: 10, width: 10, height: 60 }), 6);
-  assert.equal(calculateVolumeLiters({ length: 10, width: 10, height: 60.1 }), 6.01);
+test("calculates volume in liters from millimeters", () => {
+  assert.equal(calculateVolumeLiters({ length: 100, width: 100, height: 600 }), 6);
+  assert.equal(calculateVolumeLiters({ length: 100, width: 100, height: 601 }), 6.01);
+  assert.equal(calculateVolumeLiters({ length: 220, width: 220, height: 220 }), 10.648);
 });
 
 test("parses fixed Ozon sheets and chooses tariff by product price", () => {
