@@ -32,24 +32,28 @@ const numberFormatter = new Intl.NumberFormat("ru-RU", {
 const OZON_TARIFFS_URL =
   "https://seller-edu.ozon.ru/libra/commissions-tariffs/legal-information/full-actual-commissions?utm_source=Prices&mode=small&collapsed=false&source=faq#2-3-3-логистика";
 const MM_NOTICE_KEY = "ozon-mm-notice-v1";
-const MM_NOTICE_COOKIE = `${MM_NOTICE_KEY}=seen`;
+const PRODUCT_IMPORT_NOTICE_KEY = "ozon-product-import-notice-v1";
 
-function shouldShowMillimeterNotice() {
+function noticeCookie(key) {
+  return `${key}=seen`;
+}
+
+function shouldShowNotice(key) {
   try {
-    return window.localStorage.getItem(MM_NOTICE_KEY) !== "seen";
+    return window.localStorage.getItem(key) !== "seen";
   } catch {
-    return !document.cookie.split("; ").includes(MM_NOTICE_COOKIE);
+    return !document.cookie.split("; ").includes(noticeCookie(key));
   }
 }
 
-function rememberMillimeterNotice() {
+function rememberNotice(key) {
   try {
-    window.localStorage.setItem(MM_NOTICE_KEY, "seen");
+    window.localStorage.setItem(key, "seen");
   } catch {
     // The cookie below keeps the notice one-time even if the browser blocks localStorage.
   }
 
-  document.cookie = `${MM_NOTICE_COOKIE}; max-age=31536000; path=/; SameSite=Lax`;
+  document.cookie = `${noticeCookie(key)}; max-age=31536000; path=/; SameSite=Lax`;
 }
 
 function formatRuble(value) {
@@ -123,7 +127,10 @@ export default function App() {
   const [productFileName, setProductFileName] = useState("");
   const [selectedProductKey, setSelectedProductKey] = useState("");
   const [productStatusFilter, setProductStatusFilter] = useState(PRODUCT_STATUS_FILTERS.ACTIVE);
-  const [showMillimeterNotice, setShowMillimeterNotice] = useState(shouldShowMillimeterNotice);
+  const [showMillimeterNotice, setShowMillimeterNotice] = useState(() => shouldShowNotice(MM_NOTICE_KEY));
+  const [showProductImportNotice, setShowProductImportNotice] = useState(() =>
+    shouldShowNotice(PRODUCT_IMPORT_NOTICE_KEY),
+  );
   const [status, setStatus] = useState({
     tone: "muted",
     text: "Загрузите XLSX-файл с тарифами Ozon.",
@@ -174,8 +181,13 @@ export default function App() {
   }
 
   function closeMillimeterNotice() {
-    rememberMillimeterNotice();
+    rememberNotice(MM_NOTICE_KEY);
     setShowMillimeterNotice(false);
+  }
+
+  function closeProductImportNotice() {
+    rememberNotice(PRODUCT_IMPORT_NOTICE_KEY);
+    setShowProductImportNotice(false);
   }
 
   function resetSelectedProduct() {
@@ -270,6 +282,26 @@ export default function App() {
             </p>
             <button className="modal-button" onClick={closeMillimeterNotice} type="button">
               Понятно
+            </button>
+          </section>
+        </div>
+      ) : null}
+      {!showMillimeterNotice && showProductImportNotice ? (
+        <div className="modal-backdrop" role="presentation">
+          <section
+            aria-describedby="product-import-notice-text"
+            aria-labelledby="product-import-notice-title"
+            className="update-modal"
+            role="dialog"
+          >
+            <p className="modal-kicker">Новое обновление</p>
+            <h2 id="product-import-notice-title">Можно выбирать товары из отчёта Ozon</h2>
+            <p id="product-import-notice-text">
+              Теперь можно загрузить XLSX-отчёт «Товары», выбрать товар, и калькулятор сам возьмёт цену и объём из
+              файла. Ручной ввод цены и габаритов в миллиметрах остался на месте.
+            </p>
+            <button className="modal-button" onClick={closeProductImportNotice} type="button">
+              Отлично
             </button>
           </section>
         </div>
