@@ -6,6 +6,11 @@ import {
   parseTariffSheets,
   parseProductPrice,
 } from "./tariffs.js";
+import {
+  filterProductsByStatus,
+  parseProductReportSheets,
+  PRODUCT_STATUS_FILTERS,
+} from "./products.js";
 
 const initialInputs = {
   productPrice: "",
@@ -49,6 +54,15 @@ function rememberMillimeterNotice() {
 
 function formatRuble(value) {
   return rubleFormatter.format(value);
+}
+
+function getProductKey(product) {
+  return `${product.article}|${product.sku}|${product.barcode}`;
+}
+
+function formatProductOption(product) {
+  const title = product.article ? `${product.article} — ${product.name}` : product.name;
+  return `${title} · ${numberFormatter.format(product.volumeLiters)} л · ${formatRuble(product.price)}`;
 }
 
 function readWorkbookSheets(workbook) {
@@ -103,16 +117,35 @@ function Field({ label, value, onChange, placeholder, suffix }) {
 export default function App() {
   const [inputs, setInputs] = useState(initialInputs);
   const [parsed, setParsed] = useState(null);
+  const [productReport, setProductReport] = useState(null);
   const [selectedCluster, setSelectedCluster] = useState("");
   const [fileName, setFileName] = useState("");
+  const [productFileName, setProductFileName] = useState("");
+  const [selectedProductKey, setSelectedProductKey] = useState("");
+  const [productStatusFilter, setProductStatusFilter] = useState(PRODUCT_STATUS_FILTERS.ACTIVE);
   const [showMillimeterNotice, setShowMillimeterNotice] = useState(shouldShowMillimeterNotice);
   const [status, setStatus] = useState({
     tone: "muted",
     text: "Загрузите XLSX-файл с тарифами Ozon.",
   });
+  const [productStatus, setProductStatus] = useState({
+    tone: "muted",
+    text: "Отчёт товаров можно загрузить позже, ручной ввод уже доступен.",
+  });
   const [showAll, setShowAll] = useState(false);
 
-  const volume = useMemo(() => calculateVolumeLiters(inputs), [inputs]);
+  const products = productReport?.products ?? [];
+  const filteredProducts = useMemo(
+    () => filterProductsByStatus(products, productStatusFilter),
+    [productStatusFilter, products],
+  );
+  const selectedProduct = useMemo(
+    () => products.find((product) => getProductKey(product) === selectedProductKey) ?? null,
+    [products, selectedProductKey],
+  );
+  const manualVolume = useMemo(() => calculateVolumeLiters(inputs), [inputs]);
+  const volume = selectedProduct ? selectedProduct.volumeLiters : manualVolume;
+  const activeProductPrice = selectedProduct ? selectedProduct.price : inputs.productPrice;
 
   const result = useMemo(() => {
     if (!parsed) {
@@ -122,13 +155,13 @@ export default function App() {
     return calculateLogistics({
       tariffs: parsed.tariffs,
       defaultTariffs: parsed.defaultTariffs,
-      productPrice: inputs.productPrice,
+      productPrice: activeProductPrice,
       volume,
       sourceCluster: selectedCluster,
     });
-  }, [inputs.productPrice, parsed, selectedCluster, volume]);
+  }, [activeProductPrice, parsed, selectedCluster, volume]);
 
-  const productPrice = parseProductPrice(inputs.productPrice);
+  const productPrice = selectedProduct ? selectedProduct.price : parseProductPrice(inputs.productPrice);
   const selectedPriceColumn =
     productPrice === null
       ? "—"
@@ -143,6 +176,11 @@ export default function App() {
   function closeMillimeterNotice() {
     rememberMillimeterNotice();
     setShowMillimeterNotice(false);
+  }
+
+  function resetSelectedProduct() {
+    setSelectedProductKey("");
+    setShowAll(false);
   }
 
   async function handleFileChange(event) {
@@ -173,6 +211,39 @@ export default function App() {
       setStatus({
         tone: "danger",
         text: error instanceof Error ? error.message : "Не удалось прочитать XLSX-файл.",
+      });
+    } finally {
+      event.target.value = "";
+    }
+  }
+
+  async function handleProductFileChange(event) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    setProductFileName(file.name);
+    setSelectedProductKey("");
+    setShowAll(false);
+    setProductStatus({ tone: "muted", text: "Читаю отчёт товаров в браузере..." });
+
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { type: "array" });
+      const sheetsByName = readWorkbookSheets(workbook);
+      const nextReport = parseProductReportSheets(sheetsByName);
+
+      setProductReport(nextReport);
+      setProductStatus({
+        tone: "success",
+        text: `Отчёт загружен: ${nextReport.meta.count.toLocaleString("ru-RU")} товаров с ценой и объёмом.`,
+      });
+    } catch (error) {
+      setProductReport(null);
+      setProductStatus({
+        tone: "danger",
+        text: error instanceof Error ? error.message : "Не удалось прочитать отчёт товаров.",
       });
     } finally {
       event.target.value = "";
@@ -229,6 +300,84 @@ export default function App() {
           </a>
           .
         </p>
+
+        <section className="panel products-panel" aria-label="Импорт товаров из отчёта Ozon">
+          <div className="panel-heading panel-heading-spread">
+            <div>
+              <p className="eyebrow">Необязательно</p>
+              <h2>Товары из отчёта Ozon</h2>
+            </div>
+            <label className="ghost-upload-button" title="Загрузить XLSX-отчёт товаров">
+              <Icon symbol="↑" />
+              <span>Загрузить товары</span>
+              <input accept=".xlsx,.xls" onChange={handleProductFileChange} type="file" />
+            </label>
+          </div>
+
+          <div className={`notice ${productStatus.tone}`}>
+            <Icon symbol={productStatus.tone === "success" ? "✓" : productStatus.tone === "danger" ? "!" : "i"} />
+            <span>{productStatus.text}</span>
+          </div>
+
+          {productFileName ? <p className="file-name">Файл товаров: {productFileName}</p> : null}
+
+          {productReport ? (
+            <div className="product-picker-grid">
+              <label className="field">
+                <span>Фильтр товаров</span>
+                <select
+                  onChange={(event) => {
+                    setProductStatusFilter(event.target.value);
+                    resetSelectedProduct();
+                  }}
+                  value={productStatusFilter}
+                >
+                  <option value={PRODUCT_STATUS_FILTERS.ACTIVE}>Продаются и готовые</option>
+                  <option value={PRODUCT_STATUS_FILTERS.ALL}>Все</option>
+                  <option value={PRODUCT_STATUS_FILTERS.SELLING}>Продаются</option>
+                  <option value={PRODUCT_STATUS_FILTERS.READY}>Готовы к продаже</option>
+                  <option value={PRODUCT_STATUS_FILTERS.NOT_SELLING}>Не продаются</option>
+                </select>
+              </label>
+
+              <label className="field product-select-field">
+                <span>Товар</span>
+                <select
+                  disabled={!filteredProducts.length}
+                  onChange={(event) => {
+                    setSelectedProductKey(event.target.value);
+                    setShowAll(false);
+                  }}
+                  value={selectedProductKey}
+                >
+                  <option value="">Ручной ввод</option>
+                  {filteredProducts.map((product) => (
+                    <option key={getProductKey(product)} value={getProductKey(product)}>
+                      {formatProductOption(product)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          ) : null}
+
+          {selectedProduct ? (
+            <div className="selected-product">
+              <div>
+                <span>Выбран товар из отчёта</span>
+                <strong>{selectedProduct.name}</strong>
+                <p>
+                  {selectedProduct.article ? `${selectedProduct.article} · ` : ""}
+                  {selectedProduct.status || "Без статуса"} · {numberFormatter.format(selectedProduct.volumeLiters)} л ·{" "}
+                  {formatRuble(selectedProduct.price)}
+                </p>
+              </div>
+              <button className="ghost-button compact-button" onClick={resetSelectedProduct} type="button">
+                Ручной ввод
+              </button>
+            </div>
+          ) : null}
+        </section>
 
         <section className="panel inputs-panel" aria-label="Параметры расчёта">
           <div className="panel-heading">
@@ -292,6 +441,10 @@ export default function App() {
             <div>
               <p className="muted">Объём товара</p>
               <strong>{volume ? `${numberFormatter.format(volume)} л` : "—"}</strong>
+            </div>
+            <div>
+              <p className="muted">Источник расчёта</p>
+              <strong>{selectedProduct ? "Товар из отчёта" : "Ручной ввод"}</strong>
             </div>
             <div>
               <p className="muted">Тарифная колонка</p>
