@@ -36,6 +36,11 @@ const numberFormatter = new Intl.NumberFormat("ru-RU", {
 
 const OZON_TARIFFS_URL =
   "https://seller-edu.ozon.ru/libra/commissions-tariffs/legal-information/full-actual-commissions?utm_source=Prices&mode=small&collapsed=false&source=faq#2-3-3-логистика";
+const OZON_EXPENSES_URL = "https://docs.ozon.com/global/commissions/ozon-fees/seller-expenses-structure/";
+const OZON_DELIVERY_URL = "https://docs.ozon.com/global/commissions/ozon-fees/delivery-expenses/";
+const OZON_COMMISSIONS_URL = "https://docs.ozon.com/global/commissions/ozon-fees/commissions/";
+const OZON_PRICES_URL = "https://docs.ozon.com/global/prices/price-control/";
+const OZON_REPORTS_URL = "https://docs.ozon.com/global/en/accounting/reporting-documents/reporting-documents/";
 const MM_NOTICE_KEY = "ozon-mm-notice-v1";
 const PRODUCT_IMPORT_NOTICE_KEY = "ozon-product-import-notice-v1";
 const UNIT_ECONOMICS_NOTICE_KEY = "ozon-unit-economics-notice-v1";
@@ -90,6 +95,10 @@ function readWorkbookSheets(workbook) {
 }
 
 function getInitialPage() {
+  if (window.location.pathname === "/unit-economics-guide") {
+    return "unit-economics-guide";
+  }
+
   return window.location.pathname === "/unit-economics" ? "unit-economics" : "logistics";
 }
 
@@ -163,6 +172,7 @@ function UnitEconomicsPage({
   unitInputs,
   unitContext,
   onBackToLogistics,
+  onOpenGuide,
   onInputChange,
   onLogisticsModeChange,
 }) {
@@ -177,11 +187,25 @@ function UnitEconomicsPage({
           <p className="eyebrow">Ozon FBS</p>
           <h1>Юнит-экономика</h1>
         </div>
-        <button className="ghost-button" onClick={onBackToLogistics} type="button">
-          <Icon symbol="←" />
-          <span>Вернуться к логистике</span>
-        </button>
+        <div className="intro-actions">
+          <button className="ghost-button" onClick={onOpenGuide} type="button">
+            <Icon symbol="?" />
+            <span>Инструкция</span>
+          </button>
+          <button className="ghost-button" onClick={onBackToLogistics} type="button">
+            <Icon symbol="←" />
+            <span>Вернуться к логистике</span>
+          </button>
+        </div>
       </div>
+
+      <p className="tariff-link-note unit-guide-note">
+        Не уверены, что вводить в поля?{" "}
+        <button className="inline-link" onClick={onOpenGuide} type="button">
+          Откройте подробную инструкцию по расчёту юнит-экономики
+        </button>
+        .
+      </p>
 
       <section className="panel unit-summary-panel" aria-label="Источник данных для расчёта">
         <div className="panel-heading panel-heading-spread">
@@ -373,6 +397,193 @@ function UnitEconomicsPage({
   );
 }
 
+function UnitEconomicsGuidePage({ onBackToUnitEconomics }) {
+  return (
+    <section className="workspace guide-workspace">
+      <div className="intro">
+        <div>
+          <p className="eyebrow">Инструкция</p>
+          <h1>Как считать юнит-экономику Ozon FBS</h1>
+        </div>
+        <button className="ghost-button" onClick={onBackToUnitEconomics} type="button">
+          <Icon symbol="←" />
+          <span>Вернуться к расчёту</span>
+        </button>
+      </div>
+
+      <article className="panel guide-panel">
+        <section className="guide-section">
+          <p className="guide-lead">
+            Эта страница помогает сделать плановый расчёт прибыли по товару. Она не заменяет финансовые отчёты Ozon:
+            часть расходов зависит от категории товара, схемы работы, точки отгрузки, акций, возвратов и фактических
+            начислений. Поэтому автоматические значения можно использовать как основу, а спорные расходы лучше
+            проверять по актуальным тарифам и документам Ozon.
+          </p>
+        </section>
+
+        <section className="guide-section">
+          <h2>1. Общая формула</h2>
+          <div className="formula-box">
+            Прибыль = Цена продажи − Себестоимость − Комиссия Ozon − Эквайринг − Обработка отправления − Логистика −
+            Доставка до места выдачи − Упаковка − Реклама − Налог − Прочие расходы
+          </div>
+          <p>
+            Маржинальность показывает, какая доля цены продажи остаётся прибылью. ROI показывает прибыль относительно
+            себестоимости товара. Если себестоимость не указана, ROI не считается, потому что делить прибыль не на что.
+          </p>
+        </section>
+
+        <section className="guide-section">
+          <h2>2. Что подставляется автоматически</h2>
+          <div className="guide-list">
+            <div>
+              <strong>Цена продажи</strong>
+              <p>
+                Если вы пришли со страницы логистики или выбрали товар из XLSX-отчёта, цена переносится автоматически.
+                Её всё равно можно изменить вручную.
+              </p>
+            </div>
+            <div>
+              <strong>Объём и логистика</strong>
+              <p>
+                Объём берётся из ручных габаритов или из отчёта «Товары». Логистика берётся из загруженного XLSX с
+                тарифами Ozon. На странице юнит-экономики можно считать по средней, минимальной, максимальной или
+                вручную введённой логистике.
+              </p>
+            </div>
+            <div>
+              <strong>Источник расчёта</strong>
+              <p>
+                В верхнем блоке видно, откуда взяты данные: товар из отчёта Ozon, расчёт логистики или ручной ввод.
+                Это важно, чтобы не перепутать автоматические и ручные значения.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section className="guide-section">
+          <h2>3. Как заполнять поля расходов</h2>
+          <div className="guide-table-wrap">
+            <table className="guide-table">
+              <thead>
+                <tr>
+                  <th>Поле</th>
+                  <th>Что вводить</th>
+                  <th>Где проверить</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Себестоимость</td>
+                  <td>Закупочную или производственную стоимость товара без расходов Ozon.</td>
+                  <td>В своих закупках или в разделе цен Ozon, если вы заранее указали себестоимость.</td>
+                </tr>
+                <tr>
+                  <td>Комиссия Ozon</td>
+                  <td>Процент вознаграждения за продажу товара по категории и схеме работы.</td>
+                  <td>В актуальном разделе комиссий Ozon или в позаказном отчёте по уже доставленным заказам.</td>
+                </tr>
+                <tr>
+                  <td>Эквайринг</td>
+                  <td>Процент или оценку расхода на приём платежа. Если точного значения нет, оставьте 0 или введите запас.</td>
+                  <td>В финансовых документах и отчётах начислений за фактические заказы.</td>
+                </tr>
+                <tr>
+                  <td>Обработка отправления</td>
+                  <td>Стоимость обработки FBS-отправления до передачи в доставку.</td>
+                  <td>В актуальных тарифах Ozon: значение зависит от условий отгрузки.</td>
+                </tr>
+                <tr>
+                  <td>Доставка до места выдачи</td>
+                  <td>Расход на финальный этап доставки до ПВЗ, постамата, курьера или другого способа получения.</td>
+                  <td>В тарифах доставки Ozon или в фактических начислениях.</td>
+                </tr>
+                <tr>
+                  <td>Упаковка</td>
+                  <td>Вашу стоимость коробки, пакета, скотча, этикетки и других материалов на один заказ.</td>
+                  <td>Во внутренних расходах продавца.</td>
+                </tr>
+                <tr>
+                  <td>Реклама</td>
+                  <td>Плановый расход на продвижение одного товара или долю рекламного бюджета на заказ.</td>
+                  <td>В рекламной аналитике Ozon, если анализируете факт за период.</td>
+                </tr>
+                <tr>
+                  <td>Налог</td>
+                  <td>Процент налога по вашему режиму. Это не тариф Ozon.</td>
+                  <td>В своей системе налогообложения или у бухгалтера.</td>
+                </tr>
+                <tr>
+                  <td>Прочие расходы</td>
+                  <td>Любые дополнительные расходы на заказ: маркировка, вложения, брак, скидки вне Ozon.</td>
+                  <td>Во внутренних расходах и финансовых отчётах.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section className="guide-section">
+          <h2>4. Как выбрать логистику</h2>
+          <p>
+            Если тарифы уже рассчитаны, для планового расчёта обычно удобно начинать со средней логистики. Для
+            осторожного сценария выберите максимальную логистику. Минимальная логистика полезна как оптимистичный
+            сценарий, но её не стоит считать гарантией для каждого заказа.
+          </p>
+        </section>
+
+        <section className="guide-section">
+          <h2>5. Как читать результат</h2>
+          <div className="guide-list">
+            <div>
+              <strong>Прибыль</strong>
+              <p>Сколько рублей остаётся после всех введённых расходов.</p>
+            </div>
+            <div>
+              <strong>Маржинальность</strong>
+              <p>Прибыль относительно цены продажи. Например, 20% означает, что с 1000 ₽ цены остаётся 200 ₽ прибыли.</p>
+            </div>
+            <div>
+              <strong>ROI</strong>
+              <p>Прибыль относительно себестоимости. Показатель помогает понять отдачу на вложенные в товар деньги.</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="guide-section">
+          <h2>6. Что важно проверять отдельно</h2>
+          <p>
+            Возвраты, невыкупы, отмены, рекламные расходы и фактические начисления лучше анализировать отдельно по
+            отчётам за период. В плановом расчёте их можно учитывать запасом в ручных полях, но точная сумма появляется
+            только после фактических операций.
+          </p>
+        </section>
+
+        <section className="guide-section">
+          <h2>Официальные источники Ozon</h2>
+          <div className="source-links">
+            <a href={OZON_EXPENSES_URL} rel="noreferrer" target="_blank">
+              Структура расходов продавца
+            </a>
+            <a href={OZON_DELIVERY_URL} rel="noreferrer" target="_blank">
+              Расходы на доставку до покупателя
+            </a>
+            <a href={OZON_COMMISSIONS_URL} rel="noreferrer" target="_blank">
+              Вознаграждение за продажу товаров
+            </a>
+            <a href={OZON_PRICES_URL} rel="noreferrer" target="_blank">
+              Управление ценами и себестоимость
+            </a>
+            <a href={OZON_REPORTS_URL} rel="noreferrer" target="_blank">
+              Отчётные документы Ozon
+            </a>
+          </div>
+        </section>
+      </article>
+    </section>
+  );
+}
+
 export default function App() {
   const savedUnitDraft = useMemo(readSavedUnitEconomicsDraft, []);
   const [inputs, setInputs] = useState(initialInputs);
@@ -455,7 +666,8 @@ export default function App() {
   }, [unitContext, unitInputs]);
 
   function navigateTo(nextPage) {
-    const path = nextPage === "unit-economics" ? "/unit-economics" : "/";
+    const path =
+      nextPage === "unit-economics-guide" ? "/unit-economics-guide" : nextPage === "unit-economics" ? "/unit-economics" : "/";
     window.history.pushState({}, "", path);
     setPage(nextPage);
   }
@@ -508,6 +720,10 @@ export default function App() {
 
   function goToLogistics() {
     navigateTo("logistics");
+  }
+
+  function goToUnitEconomicsGuide() {
+    navigateTo("unit-economics-guide");
   }
 
   function updateUnitInput(name, value) {
@@ -683,9 +899,12 @@ export default function App() {
           </section>
         </div>
       ) : null}
-      {page === "unit-economics" ? (
+      {page === "unit-economics-guide" ? (
+        <UnitEconomicsGuidePage onBackToUnitEconomics={goToUnitEconomics} />
+      ) : page === "unit-economics" ? (
         <UnitEconomicsPage
           onBackToLogistics={goToLogistics}
+          onOpenGuide={goToUnitEconomicsGuide}
           onInputChange={updateUnitInput}
           onLogisticsModeChange={updateUnitLogisticsMode}
           unitContext={unitContext}
