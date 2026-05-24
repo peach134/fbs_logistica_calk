@@ -115,6 +115,13 @@ button {
   margin-bottom: 20px;
 }
 
+.intro-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .eyebrow {
   margin: 0 0 4px;
   color: var(--green);
@@ -154,6 +161,17 @@ h2 {
   border-radius: 8px;
   border: 1px solid transparent;
   white-space: nowrap;
+}
+
+.unit-nav-button {
+  border-color: #aac9bd;
+  background: var(--teal-soft);
+  color: var(--green-dark);
+}
+
+.unit-nav-button:hover {
+  border-color: var(--green);
+  background: #cceadd;
 }
 
 .icon {
@@ -513,12 +531,151 @@ tr:last-child td {
   border-bottom: 0;
 }
 
+.unit-workspace {
+  max-width: 1180px;
+}
+
+.unit-summary-panel,
+.unit-form-panel,
+.unit-result-panel {
+  padding: 22px;
+}
+
+.source-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--teal-soft);
+  color: var(--green-dark);
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.context-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.context-grid > div {
+  min-height: 76px;
+  padding: 14px;
+  border-radius: 8px;
+  background: var(--soft);
+}
+
+.context-grid span,
+.expense-list span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.context-grid strong {
+  display: block;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.unit-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(340px, 0.75fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.unit-form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.logistics-choice {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, 0.75fr);
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.unit-profit-card {
+  padding: 18px;
+  border-radius: 8px;
+  background: var(--soft);
+}
+
+.unit-profit-card.success {
+  background: #10251f;
+  color: #ffffff;
+}
+
+.unit-profit-card.danger {
+  border: 1px solid #f1b6ae;
+  background: var(--red-soft);
+  color: #7d1e16;
+}
+
+.unit-profit-card span {
+  color: inherit;
+  opacity: 0.74;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.unit-profit-card strong {
+  display: block;
+  margin-top: 8px;
+  font-size: clamp(32px, 5vw, 46px);
+  line-height: 1;
+}
+
+.unit-profit-card p {
+  margin: 10px 0 0;
+}
+
+.unit-metrics {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.unit-metrics .stat-card {
+  min-height: 76px;
+}
+
+.expense-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.expense-list > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.expense-list > div:last-child {
+  border-bottom: 0;
+}
+
+.expense-list strong {
+  white-space: nowrap;
+}
+
 @media (max-width: 820px) {
   .app-shell {
     padding: 20px;
   }
 
   .intro,
+  .intro-actions,
   .result-actions {
     align-items: stretch;
     flex-direction: column;
@@ -532,6 +689,9 @@ tr:last-child td {
 
   .form-grid,
   .product-picker-grid,
+  .context-grid,
+  .unit-grid,
+  .logistics-choice,
   .stats-grid,
   .result-topline {
     grid-template-columns: 1fr;
@@ -551,7 +711,10 @@ tr:last-child td {
 
   .inputs-panel,
   .result-panel,
-  .table-panel {
+  .table-panel,
+  .unit-summary-panel,
+  .unit-form-panel,
+  .unit-result-panel {
     padding: 16px;
   }
 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import {
   calculateLogistics,
@@ -11,6 +11,11 @@ import {
   parseProductReportSheets,
   PRODUCT_STATUS_FILTERS,
 } from "./products.js";
+import {
+  calculateUnitEconomics,
+  LOGISTICS_MODES,
+  makeEmptyUnitEconomicsInputs,
+} from "./unitEconomics.js";
 
 const initialInputs = {
   productPrice: "",
@@ -33,6 +38,8 @@ const OZON_TARIFFS_URL =
   "https://seller-edu.ozon.ru/libra/commissions-tariffs/legal-information/full-actual-commissions?utm_source=Prices&mode=small&collapsed=false&source=faq#2-3-3-логистика";
 const MM_NOTICE_KEY = "ozon-mm-notice-v1";
 const PRODUCT_IMPORT_NOTICE_KEY = "ozon-product-import-notice-v1";
+const UNIT_ECONOMICS_NOTICE_KEY = "ozon-unit-economics-notice-v1";
+const UNIT_ECONOMICS_DRAFT_KEY = "ozon-unit-economics-draft-v1";
 
 function noticeCookie(key) {
   return `${key}=seen`;
@@ -82,6 +89,40 @@ function readWorkbookSheets(workbook) {
   );
 }
 
+function getInitialPage() {
+  return window.location.pathname === "/unit-economics" ? "unit-economics" : "logistics";
+}
+
+function readSavedUnitEconomicsDraft() {
+  try {
+    const rawDraft = window.sessionStorage.getItem(UNIT_ECONOMICS_DRAFT_KEY);
+    return rawDraft ? JSON.parse(rawDraft) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveUnitEconomicsDraft(draft) {
+  try {
+    window.sessionStorage.setItem(UNIT_ECONOMICS_DRAFT_KEY, JSON.stringify(draft));
+  } catch {
+    // The draft is a convenience for page refreshes; the calculator still works without storage.
+  }
+}
+
+function formatPercent(value) {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return "—";
+  }
+
+  return `${numberFormatter.format(value)} %`;
+}
+
+function formatInputRuble(value) {
+  const amount = parseProductPrice(value);
+  return amount === null ? "—" : formatRuble(amount);
+}
+
 function StatCard({ label, value }) {
   return (
     <div className="stat-card">
@@ -118,10 +159,226 @@ function Field({ label, value, onChange, placeholder, suffix }) {
   );
 }
 
+function UnitEconomicsPage({
+  unitInputs,
+  unitContext,
+  onBackToLogistics,
+  onInputChange,
+  onLogisticsModeChange,
+}) {
+  const economics = useMemo(() => calculateUnitEconomics(unitInputs), [unitInputs]);
+  const isProfitable = economics.status === "ok" && economics.profit >= 0;
+  const resultTone = economics.status !== "ok" ? "muted" : isProfitable ? "success" : "danger";
+
+  return (
+    <section className="workspace unit-workspace">
+      <div className="intro">
+        <div>
+          <p className="eyebrow">Ozon FBS</p>
+          <h1>Юнит-экономика</h1>
+        </div>
+        <button className="ghost-button" onClick={onBackToLogistics} type="button">
+          <Icon symbol="←" />
+          <span>Вернуться к логистике</span>
+        </button>
+      </div>
+
+      <section className="panel unit-summary-panel" aria-label="Источник данных для расчёта">
+        <div className="panel-heading panel-heading-spread">
+          <div>
+            <p className="eyebrow">Плановый расчёт</p>
+            <h2>{unitContext.productName || "Ручной расчёт товара"}</h2>
+          </div>
+          <span className="source-pill">{unitContext.source || "Введено вручную"}</span>
+        </div>
+        <div className="context-grid">
+          <div>
+            <span>Цена</span>
+            <strong>{formatInputRuble(unitInputs.salePrice)}</strong>
+          </div>
+          <div>
+            <span>Объём</span>
+            <strong>{unitContext.volume ? `${numberFormatter.format(unitContext.volume)} л` : "—"}</strong>
+          </div>
+          <div>
+            <span>Кластер</span>
+            <strong>{unitContext.sourceCluster || "—"}</strong>
+          </div>
+          <div>
+            <span>Логистика</span>
+            <strong>{formatInputRuble(unitInputs.logistics)}</strong>
+          </div>
+        </div>
+      </section>
+
+      <section className="unit-grid">
+        <div className="panel unit-form-panel">
+          <div className="panel-heading">
+            <Icon symbol="₽" />
+            <h2>Доход и расходы</h2>
+          </div>
+
+          <div className="form-grid unit-form-grid">
+            <Field
+              label="Цена продажи"
+              onChange={(value) => onInputChange("salePrice", value)}
+              placeholder="1000"
+              suffix="₽"
+              value={unitInputs.salePrice}
+            />
+            <Field
+              label="Себестоимость"
+              onChange={(value) => onInputChange("cost", value)}
+              placeholder="400"
+              suffix="₽"
+              value={unitInputs.cost}
+            />
+            <Field
+              label="Комиссия Ozon"
+              onChange={(value) => onInputChange("commissionPercent", value)}
+              placeholder="15"
+              suffix="%"
+              value={unitInputs.commissionPercent}
+            />
+            <Field
+              label="Эквайринг"
+              onChange={(value) => onInputChange("acquiringPercent", value)}
+              placeholder="1,5"
+              suffix="%"
+              value={unitInputs.acquiringPercent}
+            />
+            <Field
+              label="Обработка отправления"
+              onChange={(value) => onInputChange("processing", value)}
+              placeholder="30"
+              suffix="₽"
+              value={unitInputs.processing}
+            />
+            <Field
+              label="Доставка до места выдачи"
+              onChange={(value) => onInputChange("destinationDelivery", value)}
+              placeholder="25"
+              suffix="₽"
+              value={unitInputs.destinationDelivery}
+            />
+            <Field
+              label="Упаковка"
+              onChange={(value) => onInputChange("packaging", value)}
+              placeholder="15"
+              suffix="₽"
+              value={unitInputs.packaging}
+            />
+            <Field
+              label="Реклама"
+              onChange={(value) => onInputChange("advertising", value)}
+              placeholder="50"
+              suffix="₽"
+              value={unitInputs.advertising}
+            />
+            <Field
+              label="Налог"
+              onChange={(value) => onInputChange("taxPercent", value)}
+              placeholder="6"
+              suffix="%"
+              value={unitInputs.taxPercent}
+            />
+            <Field
+              label="Прочие расходы"
+              onChange={(value) => onInputChange("otherExpenses", value)}
+              placeholder="0"
+              suffix="₽"
+              value={unitInputs.otherExpenses}
+            />
+          </div>
+
+          <div className="logistics-choice">
+            <label className="field">
+              <span>Логистика для расчёта</span>
+              <select onChange={(event) => onLogisticsModeChange(event.target.value)} value={unitInputs.logisticsMode}>
+                <option disabled={!unitContext.logisticsStats} value={LOGISTICS_MODES.AVERAGE}>
+                  Средняя из расчёта логистики
+                </option>
+                <option disabled={!unitContext.logisticsStats} value={LOGISTICS_MODES.MIN}>
+                  Минимальная из расчёта логистики
+                </option>
+                <option disabled={!unitContext.logisticsStats} value={LOGISTICS_MODES.MAX}>
+                  Максимальная из расчёта логистики
+                </option>
+                <option value={LOGISTICS_MODES.MANUAL}>Ввести вручную</option>
+              </select>
+            </label>
+            <Field
+              label="Сумма логистики"
+              onChange={(value) => onInputChange("logistics", value)}
+              placeholder="120"
+              suffix="₽"
+              value={unitInputs.logistics}
+            />
+          </div>
+        </div>
+
+        <aside className="panel unit-result-panel" aria-label="Итог юнит-экономики">
+          <div className={`unit-profit-card ${resultTone}`}>
+            <span>Прибыль</span>
+            <strong>{economics.status === "ok" ? formatRuble(economics.profit) : "—"}</strong>
+            <p>{economics.status === "ok" ? (isProfitable ? "Товар в плюсе" : "Товар в минусе") : economics.message}</p>
+          </div>
+
+          {economics.status === "ok" ? (
+            <>
+              <div className="unit-metrics">
+                <StatCard label="Маржинальность" value={formatPercent(economics.marginPercent)} />
+                <StatCard label="ROI" value={formatPercent(economics.roiPercent)} />
+                <StatCard label="Расходы всего" value={formatRuble(economics.expenses.total)} />
+              </div>
+
+              <div className="expense-list">
+                <div>
+                  <span>Себестоимость</span>
+                  <strong>{formatRuble(economics.expenses.cost)}</strong>
+                </div>
+                <div>
+                  <span>Комиссия Ozon</span>
+                  <strong>{formatRuble(economics.expenses.commission)}</strong>
+                </div>
+                <div>
+                  <span>Эквайринг</span>
+                  <strong>{formatRuble(economics.expenses.acquiring)}</strong>
+                </div>
+                <div>
+                  <span>Логистика</span>
+                  <strong>{formatRuble(economics.expenses.logistics)}</strong>
+                </div>
+                <div>
+                  <span>Остальные расходы</span>
+                  <strong>
+                    {formatRuble(
+                      economics.expenses.processing +
+                        economics.expenses.destinationDelivery +
+                        economics.expenses.packaging +
+                        economics.expenses.advertising +
+                        economics.expenses.tax +
+                        economics.expenses.otherExpenses,
+                    )}
+                  </strong>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="empty-state">{economics.message}</div>
+          )}
+        </aside>
+      </section>
+    </section>
+  );
+}
+
 export default function App() {
+  const savedUnitDraft = useMemo(readSavedUnitEconomicsDraft, []);
   const [inputs, setInputs] = useState(initialInputs);
   const [parsed, setParsed] = useState(null);
   const [productReport, setProductReport] = useState(null);
+  const [page, setPage] = useState(getInitialPage);
   const [selectedCluster, setSelectedCluster] = useState("");
   const [fileName, setFileName] = useState("");
   const [productFileName, setProductFileName] = useState("");
@@ -131,6 +388,14 @@ export default function App() {
   const [showProductImportNotice, setShowProductImportNotice] = useState(() =>
     shouldShowNotice(PRODUCT_IMPORT_NOTICE_KEY),
   );
+  const [showUnitEconomicsNotice, setShowUnitEconomicsNotice] = useState(() =>
+    shouldShowNotice(UNIT_ECONOMICS_NOTICE_KEY),
+  );
+  const [unitInputs, setUnitInputs] = useState(() => ({
+    ...makeEmptyUnitEconomicsInputs(),
+    ...(savedUnitDraft?.inputs ?? {}),
+  }));
+  const [unitContext, setUnitContext] = useState(() => savedUnitDraft?.context ?? {});
   const [status, setStatus] = useState({
     tone: "muted",
     text: "Загрузите XLSX-файл с тарифами Ozon.",
@@ -176,6 +441,93 @@ export default function App() {
         ? "Для товаров до 300 руб."
         : "Для товаров свыше 300 руб.";
 
+  useEffect(() => {
+    function handlePopState() {
+      setPage(getInitialPage());
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  useEffect(() => {
+    saveUnitEconomicsDraft({ inputs: unitInputs, context: unitContext });
+  }, [unitContext, unitInputs]);
+
+  function navigateTo(nextPage) {
+    const path = nextPage === "unit-economics" ? "/unit-economics" : "/";
+    window.history.pushState({}, "", path);
+    setPage(nextPage);
+  }
+
+  function getLogisticsAmount(mode) {
+    if (result.status !== "ok") {
+      return null;
+    }
+
+    if (mode === LOGISTICS_MODES.MIN) {
+      return result.stats.min;
+    }
+
+    if (mode === LOGISTICS_MODES.MAX) {
+      return result.stats.max;
+    }
+
+    return result.stats.average;
+  }
+
+  function buildUnitEconomicsDraft() {
+    const logisticsAmount = getLogisticsAmount(LOGISTICS_MODES.AVERAGE);
+    return {
+      inputs: {
+        ...unitInputs,
+        salePrice: productPrice === null ? unitInputs.salePrice : String(productPrice),
+        logistics: logisticsAmount === null ? unitInputs.logistics : logisticsAmount.toFixed(2),
+        logisticsMode: logisticsAmount === null ? LOGISTICS_MODES.MANUAL : LOGISTICS_MODES.AVERAGE,
+      },
+      context: {
+        productName: selectedProduct?.name ?? "",
+        article: selectedProduct?.article ?? "",
+        sku: selectedProduct?.sku ?? "",
+        category: selectedProduct?.category ?? "",
+        source: selectedProduct ? "Товар из отчёта Ozon" : "Из расчёта логистики",
+        sourceCluster: selectedCluster,
+        volume,
+        logisticsStats: result.status === "ok" ? result.stats : null,
+      },
+    };
+  }
+
+  function goToUnitEconomics() {
+    const draft = buildUnitEconomicsDraft();
+    setUnitInputs(draft.inputs);
+    setUnitContext(draft.context);
+    saveUnitEconomicsDraft(draft);
+    navigateTo("unit-economics");
+  }
+
+  function goToLogistics() {
+    navigateTo("logistics");
+  }
+
+  function updateUnitInput(name, value) {
+    setUnitInputs((current) => ({
+      ...current,
+      [name]: value,
+      ...(name === "logistics" ? { logisticsMode: LOGISTICS_MODES.MANUAL } : {}),
+    }));
+  }
+
+  function updateUnitLogisticsMode(mode) {
+    const logisticsAmount = getLogisticsAmount(mode);
+    setUnitInputs((current) => ({
+      ...current,
+      logisticsMode: mode,
+      logistics:
+        mode === LOGISTICS_MODES.MANUAL || logisticsAmount === null ? current.logistics : logisticsAmount.toFixed(2),
+    }));
+  }
+
   function updateInput(name, value) {
     setInputs((current) => ({ ...current, [name]: value }));
   }
@@ -188,6 +540,11 @@ export default function App() {
   function closeProductImportNotice() {
     rememberNotice(PRODUCT_IMPORT_NOTICE_KEY);
     setShowProductImportNotice(false);
+  }
+
+  function closeUnitEconomicsNotice() {
+    rememberNotice(UNIT_ECONOMICS_NOTICE_KEY);
+    setShowUnitEconomicsNotice(false);
   }
 
   function resetSelectedProduct() {
@@ -306,17 +663,52 @@ export default function App() {
           </section>
         </div>
       ) : null}
+      {!showMillimeterNotice && !showProductImportNotice && showUnitEconomicsNotice ? (
+        <div className="modal-backdrop" role="presentation">
+          <section
+            aria-describedby="unit-economics-notice-text"
+            aria-labelledby="unit-economics-notice-title"
+            className="update-modal"
+            role="dialog"
+          >
+            <p className="modal-kicker">Новое обновление</p>
+            <h2 id="unit-economics-notice-title">Появился полный расчёт юнит-экономики</h2>
+            <p id="unit-economics-notice-text">
+              Логистика осталась отдельным быстрым калькулятором. Теперь из неё можно перейти на новую страницу и
+              посчитать прибыль, маржинальность и ROI с учётом себестоимости, комиссии, эквайринга и других расходов.
+            </p>
+            <button className="modal-button" onClick={closeUnitEconomicsNotice} type="button">
+              Хорошо
+            </button>
+          </section>
+        </div>
+      ) : null}
+      {page === "unit-economics" ? (
+        <UnitEconomicsPage
+          onBackToLogistics={goToLogistics}
+          onInputChange={updateUnitInput}
+          onLogisticsModeChange={updateUnitLogisticsMode}
+          unitContext={unitContext}
+          unitInputs={unitInputs}
+        />
+      ) : (
       <section className="workspace">
         <div className="intro">
           <div>
             <p className="eyebrow">Ozon FBS</p>
             <h1>Калькулятор логистики</h1>
           </div>
-          <label className="upload-button" title="Загрузить XLSX с тарифами">
-            <Icon symbol="↑" />
-            <span>Загрузить XLSX</span>
-            <input accept=".xlsx,.xls" onChange={handleFileChange} type="file" />
-          </label>
+          <div className="intro-actions">
+            <button className="ghost-button unit-nav-button" onClick={goToUnitEconomics} type="button">
+              <Icon symbol="→" />
+              <span>Перейти в полный расчёт юнит-экономики</span>
+            </button>
+            <label className="upload-button" title="Загрузить XLSX с тарифами">
+              <Icon symbol="↑" />
+              <span>Загрузить XLSX</span>
+              <input accept=".xlsx,.xls" onChange={handleFileChange} type="file" />
+            </label>
+          </div>
         </div>
 
         <div className={`notice ${status.tone}`}>
@@ -544,6 +936,7 @@ export default function App() {
           </section>
         ) : null}
       </section>
+      )}
     </main>
   );
 }
