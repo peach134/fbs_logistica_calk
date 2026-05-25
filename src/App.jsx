@@ -178,19 +178,164 @@ function Field({ label, value, onChange, placeholder, suffix }) {
   );
 }
 
+function TariffUploadPanel({ fileName, status, onFileChange, showDownloadNote = false }) {
+  return (
+    <section className="panel data-panel" aria-label="Загрузка тарифов логистики Ozon">
+      <div className="panel-heading panel-heading-spread">
+        <div>
+          <p className="eyebrow">Обязательно для логистики</p>
+          <h2>Тарифы логистики Ozon</h2>
+        </div>
+        <label className="ghost-upload-button" title="Загрузить XLSX с тарифами">
+          <Icon symbol="↑" />
+          <span>Загрузить тарифы</span>
+          <input accept=".xlsx,.xls" onChange={onFileChange} type="file" />
+        </label>
+      </div>
+
+      <div className={`notice ${status.tone}`}>
+        <Icon symbol={status.tone === "success" ? "✓" : status.tone === "danger" ? "!" : "i"} />
+        <span>{status.text}</span>
+      </div>
+
+      {fileName ? <p className="file-name">Файл тарифов: {fileName}</p> : null}
+
+      {showDownloadNote ? (
+        <p className="tariff-link-note">
+          Файл с актуальными тарифами можно скачать на{" "}
+          <a href={OZON_TARIFFS_URL} rel="noreferrer" target="_blank">
+            странице Ozon Seller
+          </a>
+          .
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function SelectedProductSummary({ selectedProduct, onResetSelectedProduct }) {
+  if (!selectedProduct) {
+    return null;
+  }
+
+  return (
+    <div className="selected-product">
+      <div>
+        <span>Выбран товар из отчёта</span>
+        <strong>{selectedProduct.name}</strong>
+        <p>
+          {selectedProduct.article ? `${selectedProduct.article} · ` : ""}
+          {selectedProduct.status || "Без статуса"} · {numberFormatter.format(selectedProduct.volumeLiters)} л ·{" "}
+          {formatRuble(selectedProduct.price)}
+        </p>
+      </div>
+      <button className="ghost-button compact-button" onClick={onResetSelectedProduct} type="button">
+        Ручной ввод
+      </button>
+    </div>
+  );
+}
+
+function ProductReportPanel({
+  productFileName,
+  productReport,
+  productStatus,
+  productStatusFilter,
+  filteredProducts,
+  selectedProductKey,
+  selectedProduct,
+  onProductFileChange,
+  onProductStatusFilterChange,
+  onProductSelect,
+  onResetSelectedProduct,
+}) {
+  return (
+    <section className="panel products-panel" aria-label="Импорт товаров из отчёта Ozon">
+      <div className="panel-heading panel-heading-spread">
+        <div>
+          <p className="eyebrow">Необязательно</p>
+          <h2>Товары из отчёта Ozon</h2>
+        </div>
+        <label className="ghost-upload-button" title="Загрузить XLSX-отчёт товаров">
+          <Icon symbol="↑" />
+          <span>Загрузить товары</span>
+          <input accept=".xlsx,.xls" onChange={onProductFileChange} type="file" />
+        </label>
+      </div>
+
+      <div className={`notice ${productStatus.tone}`}>
+        <Icon symbol={productStatus.tone === "success" ? "✓" : productStatus.tone === "danger" ? "!" : "i"} />
+        <span>{productStatus.text}</span>
+      </div>
+
+      {productFileName ? <p className="file-name">Файл товаров: {productFileName}</p> : null}
+
+      {productReport ? (
+        <div className="product-picker-grid">
+          <label className="field">
+            <span>Фильтр товаров</span>
+            <select onChange={(event) => onProductStatusFilterChange(event.target.value)} value={productStatusFilter}>
+              <option value={PRODUCT_STATUS_FILTERS.ACTIVE}>Продаются и готовые</option>
+              <option value={PRODUCT_STATUS_FILTERS.ALL}>Все</option>
+              <option value={PRODUCT_STATUS_FILTERS.SELLING}>Продаются</option>
+              <option value={PRODUCT_STATUS_FILTERS.READY}>Готовы к продаже</option>
+              <option value={PRODUCT_STATUS_FILTERS.NOT_SELLING}>Не продаются</option>
+            </select>
+          </label>
+
+          <label className="field product-select-field">
+            <span>Товар</span>
+            <select
+              disabled={!filteredProducts.length}
+              onChange={(event) => onProductSelect(event.target.value)}
+              value={selectedProductKey}
+            >
+              <option value="">Ручной ввод</option>
+              {filteredProducts.map((product) => (
+                <option key={getProductKey(product)} value={getProductKey(product)}>
+                  {formatProductOption(product)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      ) : null}
+
+      <SelectedProductSummary selectedProduct={selectedProduct} onResetSelectedProduct={onResetSelectedProduct} />
+    </section>
+  );
+}
+
 function UnitEconomicsPage({
   commissionFileName,
   commissionLookup,
   commissionSource,
   commissionStatus,
+  fileName,
+  filteredProducts,
+  parsed,
+  productFileName,
+  productReport,
+  productStatus,
+  productStatusFilter,
+  selectedCluster,
+  selectedProduct,
+  selectedProductKey,
+  status,
   unitInputs,
   unitContext,
   onApplyCommissionRate,
   onBackToLogistics,
+  onClusterChange,
   onCommissionFileChange,
+  onFileChange,
   onOpenGuide,
   onInputChange,
   onLogisticsModeChange,
+  onProductFileChange,
+  onProductSelect,
+  onProductStatusFilterChange,
+  onResetSelectedProduct,
 }) {
   const economics = useMemo(() => calculateUnitEconomics(unitInputs), [unitInputs]);
   const isProfitable = economics.status === "ok" && economics.profit >= 0;
@@ -222,6 +367,50 @@ function UnitEconomicsPage({
         </button>
         .
       </p>
+
+      <section className="unit-data-grid" aria-label="Файлы и товар для расчёта">
+        <TariffUploadPanel fileName={fileName} onFileChange={onFileChange} showDownloadNote status={status} />
+
+        <ProductReportPanel
+          filteredProducts={filteredProducts}
+          onProductFileChange={onProductFileChange}
+          onProductSelect={onProductSelect}
+          onProductStatusFilterChange={onProductStatusFilterChange}
+          onResetSelectedProduct={onResetSelectedProduct}
+          productFileName={productFileName}
+          productReport={productReport}
+          productStatus={productStatus}
+          productStatusFilter={productStatusFilter}
+          selectedProduct={selectedProduct}
+          selectedProductKey={selectedProductKey}
+        />
+
+        <section className="panel data-panel logistics-source-panel" aria-label="Кластер отправления для расчёта логистики">
+          <div className="panel-heading">
+            <Icon symbol="↗" />
+            <h2>Кластер отправления</h2>
+          </div>
+          <label className="field cluster-field standalone-cluster-field">
+            <span>Кластер отправления</span>
+            <select
+              disabled={!parsed?.sourceClusters.length}
+              onChange={(event) => onClusterChange(event.target.value)}
+              value={selectedCluster}
+            >
+              {!parsed?.sourceClusters.length ? <option>Сначала загрузите тарифы</option> : null}
+              {parsed?.sourceClusters.map((cluster) => (
+                <option key={cluster} value={cluster}>
+                  {cluster}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="helper-text">
+            Этот кластер нужен, чтобы автоматически подставить логистику в расчёт. Если тарифы не загружены, сумму
+            логистики можно ввести вручную ниже.
+          </p>
+        </section>
+      </section>
 
       <section className="panel unit-summary-panel" aria-label="Источник данных для расчёта">
         <div className="panel-heading panel-heading-spread">
@@ -801,6 +990,61 @@ export default function App() {
     );
   }, [commissionLookup, commissionWasEditedManually]);
 
+  useEffect(() => {
+    if (page !== "unit-economics") {
+      return;
+    }
+
+    setUnitContext({
+      productName: selectedProduct?.name ?? "",
+      article: selectedProduct?.article ?? "",
+      sku: selectedProduct?.sku ?? "",
+      category: selectedProduct?.category ?? "",
+      productType: selectedProduct?.type ?? "",
+      source: selectedProduct ? "Товар из отчёта Ozon" : "Введено вручную",
+      sourceCluster: selectedCluster,
+      volume,
+      logisticsStats: result.status === "ok" ? result.stats : null,
+    });
+  }, [page, result, selectedCluster, selectedProduct, volume]);
+
+  useEffect(() => {
+    if (page !== "unit-economics" || !selectedProduct) {
+      return;
+    }
+
+    setUnitInputs((current) => {
+      const nextSalePrice = String(selectedProduct.price);
+      return current.salePrice === nextSalePrice
+        ? current
+        : {
+            ...current,
+            salePrice: nextSalePrice,
+          };
+    });
+  }, [page, selectedProduct]);
+
+  useEffect(() => {
+    if (page !== "unit-economics" || unitInputs.logisticsMode === LOGISTICS_MODES.MANUAL) {
+      return;
+    }
+
+    const logisticsAmount = getLogisticsAmount(unitInputs.logisticsMode);
+    if (logisticsAmount === null) {
+      return;
+    }
+
+    setUnitInputs((current) => {
+      const nextLogistics = logisticsAmount.toFixed(2);
+      return current.logistics === nextLogistics
+        ? current
+        : {
+            ...current,
+            logistics: nextLogistics,
+          };
+    });
+  }, [page, result, unitInputs.logisticsMode]);
+
   function navigateTo(nextPage) {
     const path =
       nextPage === "unit-economics-guide" ? "/unit-economics-guide" : nextPage === "unit-economics" ? "/unit-economics" : "/";
@@ -1120,12 +1364,38 @@ export default function App() {
           commissionLookup={commissionLookup}
           commissionSource={commissionSource}
           commissionStatus={commissionStatus}
+          fileName={fileName}
+          filteredProducts={filteredProducts}
           onApplyCommissionRate={applyCommissionRateFromTable}
           onBackToLogistics={goToLogistics}
+          onClusterChange={(value) => {
+            setSelectedCluster(value);
+            setShowAll(false);
+          }}
           onCommissionFileChange={handleCommissionFileChange}
+          onFileChange={handleFileChange}
           onOpenGuide={goToUnitEconomicsGuide}
           onInputChange={updateUnitInput}
           onLogisticsModeChange={updateUnitLogisticsMode}
+          onProductFileChange={handleProductFileChange}
+          onProductSelect={(value) => {
+            setSelectedProductKey(value);
+            setShowAll(false);
+          }}
+          onProductStatusFilterChange={(value) => {
+            setProductStatusFilter(value);
+            resetSelectedProduct();
+          }}
+          onResetSelectedProduct={resetSelectedProduct}
+          parsed={parsed}
+          productFileName={productFileName}
+          productReport={productReport}
+          productStatus={productStatus}
+          productStatusFilter={productStatusFilter}
+          selectedCluster={selectedCluster}
+          selectedProduct={selectedProduct}
+          selectedProductKey={selectedProductKey}
+          status={status}
           unitContext={unitContext}
           unitInputs={unitInputs}
         />
@@ -1163,83 +1433,25 @@ export default function App() {
           .
         </p>
 
-        <section className="panel products-panel" aria-label="Импорт товаров из отчёта Ozon">
-          <div className="panel-heading panel-heading-spread">
-            <div>
-              <p className="eyebrow">Необязательно</p>
-              <h2>Товары из отчёта Ozon</h2>
-            </div>
-            <label className="ghost-upload-button" title="Загрузить XLSX-отчёт товаров">
-              <Icon symbol="↑" />
-              <span>Загрузить товары</span>
-              <input accept=".xlsx,.xls" onChange={handleProductFileChange} type="file" />
-            </label>
-          </div>
-
-          <div className={`notice ${productStatus.tone}`}>
-            <Icon symbol={productStatus.tone === "success" ? "✓" : productStatus.tone === "danger" ? "!" : "i"} />
-            <span>{productStatus.text}</span>
-          </div>
-
-          {productFileName ? <p className="file-name">Файл товаров: {productFileName}</p> : null}
-
-          {productReport ? (
-            <div className="product-picker-grid">
-              <label className="field">
-                <span>Фильтр товаров</span>
-                <select
-                  onChange={(event) => {
-                    setProductStatusFilter(event.target.value);
-                    resetSelectedProduct();
-                  }}
-                  value={productStatusFilter}
-                >
-                  <option value={PRODUCT_STATUS_FILTERS.ACTIVE}>Продаются и готовые</option>
-                  <option value={PRODUCT_STATUS_FILTERS.ALL}>Все</option>
-                  <option value={PRODUCT_STATUS_FILTERS.SELLING}>Продаются</option>
-                  <option value={PRODUCT_STATUS_FILTERS.READY}>Готовы к продаже</option>
-                  <option value={PRODUCT_STATUS_FILTERS.NOT_SELLING}>Не продаются</option>
-                </select>
-              </label>
-
-              <label className="field product-select-field">
-                <span>Товар</span>
-                <select
-                  disabled={!filteredProducts.length}
-                  onChange={(event) => {
-                    setSelectedProductKey(event.target.value);
-                    setShowAll(false);
-                  }}
-                  value={selectedProductKey}
-                >
-                  <option value="">Ручной ввод</option>
-                  {filteredProducts.map((product) => (
-                    <option key={getProductKey(product)} value={getProductKey(product)}>
-                      {formatProductOption(product)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-          ) : null}
-
-          {selectedProduct ? (
-            <div className="selected-product">
-              <div>
-                <span>Выбран товар из отчёта</span>
-                <strong>{selectedProduct.name}</strong>
-                <p>
-                  {selectedProduct.article ? `${selectedProduct.article} · ` : ""}
-                  {selectedProduct.status || "Без статуса"} · {numberFormatter.format(selectedProduct.volumeLiters)} л ·{" "}
-                  {formatRuble(selectedProduct.price)}
-                </p>
-              </div>
-              <button className="ghost-button compact-button" onClick={resetSelectedProduct} type="button">
-                Ручной ввод
-              </button>
-            </div>
-          ) : null}
-        </section>
+        <ProductReportPanel
+          filteredProducts={filteredProducts}
+          onProductFileChange={handleProductFileChange}
+          onProductSelect={(value) => {
+            setSelectedProductKey(value);
+            setShowAll(false);
+          }}
+          onProductStatusFilterChange={(value) => {
+            setProductStatusFilter(value);
+            resetSelectedProduct();
+          }}
+          onResetSelectedProduct={resetSelectedProduct}
+          productFileName={productFileName}
+          productReport={productReport}
+          productStatus={productStatus}
+          productStatusFilter={productStatusFilter}
+          selectedProduct={selectedProduct}
+          selectedProductKey={selectedProductKey}
+        />
 
         <section className="panel inputs-panel" aria-label="Параметры расчёта">
           <div className="panel-heading">

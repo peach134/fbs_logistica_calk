@@ -1,108 +1,118 @@
-# Project Notes for Agents
+# AGENTS.md
 
-## Product Context
+## WHAT
 
-This is a React + Vite browser-only calculator for Ozon FBS logistics. It reads XLSX files locally in the browser and never uploads seller data to a server.
+React + Vite browser-only app for Ozon FBS calculations. It must stay fully client-side: seller XLSX files are parsed in the browser and are not uploaded to a server.
 
-The app supports two XLSX inputs:
+Current pages:
 
-1. Ozon logistics tariff file.
-   - Main sheet: `Логистика РФ`
-   - Default tariff sheet: `Тарифы по умолчанию`
-   - Main tariff columns:
-     - B: `Объём товара`
-     - C: `Кластер отправления`
-     - D: `Кластер доставки`
-     - E: `Для товаров до 300 руб.`
-     - F: `Для товаров свыше 300 руб.`
-   - Default tariff columns:
-     - B: `Объём товара`
-     - C: `Для товаров до 300 руб.`
-     - D: `Для товаров свыше 300 руб.`
+- `/` — fast Ozon FBS logistics calculator.
+- `/unit-economics` — planned unit economics / margin calculator.
+- `/unit-economics-guide` — detailed Russian guide for filling unit-economics fields.
 
-2. Ozon seller product report file.
-   - Sheet: `Товары`
-   - Header row is usually row 2.
-   - Important columns:
-     - `Артикул`
-     - `SKU`
-     - `Barcode`
-     - `Название товара`
-     - `Статус товара`
-     - `Категория`
-     - `Тип`
-     - `Объем товара, л`
-     - `Доступно к продаже по схеме FBS, шт.`
-     - `Текущая цена с учетом скидки, ₽`
+Core files:
 
-## Core Rules
+- `src/App.jsx` — UI, routing, uploads, page state, notices.
+- `src/tariffs.js` — logistics tariff parsing and logistics calculation.
+- `src/products.js` — Ozon `Товары` report parsing and status filtering.
+- `src/commissionRates.js` — Ozon FBS commission-rate table parsing and lookup.
+- `src/unitEconomics.js` — profit, margin, ROI calculation.
+- `src/*.test.mjs` — logic tests.
+- `src/styles.css` — app styling.
+- `vercel.json` — SPA rewrites for direct links like `/unit-economics`.
 
-- The app must stay fully client-side.
-- Do not add backend, API keys, account scraping, or server calls unless explicitly requested.
-- Manual calculator mode must always remain available.
-- Manual dimensions are entered in millimeters.
+Supported XLSX inputs:
+
+- Logistics tariff XLSX:
+  - sheet `Логистика РФ`: B volume, C source cluster, D destination, E under 300 rub, F over 300 rub.
+  - sheet `Тарифы по умолчанию`: B volume, C under 300 rub, D over 300 rub.
+- Product report XLSX:
+  - sheet `Товары`, usually headers on row 2.
+  - important columns: `Артикул`, `SKU`, `Barcode`, `Название товара`, `Статус товара`, `Категория`, `Тип`, `Объем товара, л`, `Доступно к продаже по схеме FBS, шт.`, `Текущая цена с учетом скидки, ₽`.
+- Commission-rate XLSX:
+  - official Ozon `Таблица категорий для расчёта вознаграждения`.
+  - current known sheet: `Прайс РФ (БЗ)`.
+  - FBS block columns are parsed from header `FBS`; current file has FBS in columns O:T.
+  - lookup is strict `category + product type + price range`; no fuzzy matching.
+
+## WHY
+
+The app helps a seller quickly estimate:
+
+- FBS logistics by Ozon tariff XLSX.
+- Min / average / max route logistics by source cluster.
+- Universal/default logistics tariff as a reference.
+- Planned unit economics: profit, margin, ROI, and expense breakdown.
+- Ozon commission percentage from the official commission-rate XLSX when an exact match is available.
+
+The logistics calculator must remain a fast standalone tool. Unit economics is a separate page so the logistics flow does not become overloaded.
+
+## HOW
+
+Important product rules:
+
+- Manual dimensions are in millimeters.
 - Manual volume formula: `lengthMm * widthMm * heightMm / 1_000_000`.
-- Do not round volume before matching tariff ranges.
-- Product report mode uses Ozon's ready `Объем товара, л`; do not recalculate product report volume from dimensions.
-- Price column selection:
-  - `price <= 300` uses `Для товаров до 300 руб.`
-  - `price > 300` uses `Для товаров свыше 300 руб.`
+- Never round volume before tariff matching.
+- Product-report mode uses Ozon `Объем товара, л`; do not recalculate it from dimensions.
+- Price column selection for logistics:
+  - `price <= 300` → `Для товаров до 300 руб.`
+  - `price > 300` → `Для товаров свыше 300 руб.`
 - Min / average / max are calculated from route tariffs only.
-- Universal tariff is shown as a reference value from `Тарифы по умолчанию`; it does not replace route tariffs when route tariffs exist.
+- Universal tariff is reference-only and must not replace route tariffs when route tariffs exist.
+- Default tariff fallback is used only when route tariffs cannot be found.
+- Unit economics is a planned estimate, not an official Ozon accounting report.
+- Manual inputs must always remain available, especially commission, tax, packaging, advertising, and other expenses.
 
-## Code Map
+Commission import rules:
 
-- `src/App.jsx`: UI, file uploads, selected product state, manual inputs, result rendering.
-- `src/tariffs.js`: tariff XLSX parsing, volume range parsing, logistics calculation.
-- `src/products.js`: product report XLSX parsing and product status filtering.
-- `src/tariffs.test.mjs`: tests for tariff parsing and calculation.
-- `src/products.test.mjs`: tests for product report parsing and filtering.
-- `src/styles.css`: app styling.
+- Support only FBS for now.
+- Convert Excel rates like `0.47` to `47%`.
+- Match only exact normalized `category + type`.
+- Normalization may trim, lowercase, replace `ё` with `е`, and collapse spaces.
+- Do not guess by category only or product type only.
+- If no exact match, ambiguous match, missing file, or missing price: keep commission manual.
+- If user edits commission manually, treat it as manual until they explicitly apply the table rate again.
 
-## Validation Commands
+Notices:
 
-Use these before committing meaningful changes:
+- One-time notices use `localStorage` with cookie fallback.
+- Known keys:
+  - `ozon-mm-notice-v1`
+  - `ozon-product-import-notice-v1`
+  - `ozon-unit-economics-notice-v1`
+  - `ozon-commission-import-notice-v1`
+- New notices should be sequential, not stacked on top of each other.
+
+Validation before commit:
 
 ```bash
 npm run test:logic
 npm run build
 ```
 
-In the Codex Windows sandbox, Vite can sometimes fail on path/access issues even when the code is valid. If that happens, rerun the actual build command outside the sandbox with approval.
+On this Windows/Codex setup, `npm.ps1` or sandbox path handling may fail. Use the bundled Node/Vite command or rerun with approval when the failure is environment-related, not code-related.
 
-## Known Good Sample Checks
+Known sample checks:
 
-Tariff XLSX sample:
+- Logistics file `logistika-fbo-fbs-01052026_1777018200 (2).xlsx`.
+- Cluster `Алматы`, price `2222`, volume `10.648 л`:
+  - bucket `10,001-11 л`, directions `31`, min `123`, avg `198.68`, max `264`, universal `102`.
+- Cluster `Алматы`, price `222`, volume `10.648 л`:
+  - directions `31`, min / avg / max `79.30`, universal `79.30`.
+- Product file `Товары_21.05.2026 (1).xlsx`:
+  - parsed products `135`.
+  - product `п50`: price `850`, volume `4.52 л`.
+  - product `п75`: price `500`, volume `6.78 л`.
+- Commission file `Таблица_категорий_для_расчёта_вознаграждения_06042026-2_1773932702.xlsx`:
+  - parsed FBS rates `9511`, duplicate count `1`.
+  - with the sample product file, `135/135` products matched by exact category + type.
 
-- File name used during development: `logistika-fbo-fbs-01052026_1777018200 (2).xlsx`
-- For cluster `Алматы`, price `2222`, volume `10.648 л`:
-  - volume bucket: `10,001-11 л`
-  - directions: `31`
-  - min: `123`
-  - average: `198.68`
-  - max: `264`
-  - universal tariff: `102`
-- For cluster `Алматы`, price `222`, volume `10.648 л`:
-  - directions: `31`
-  - min / average / max: `79.30`
-  - universal tariff: `79.30`
+Coding conventions:
 
-Product report XLSX sample:
-
-- File name used during development: `Товары_21.05.2026 (1).xlsx`
-- Expected parsed products: `135`
-- Active products (`Продается` + `Готов к продаже`): `133`
-- Product `п50`:
-  - price: `850`
-  - volume: `4.52 л`
-- Product `п75`:
-  - price: `500`
-  - volume: `6.78 л`
-
-## UX Notes
-
-- Interface language is Russian.
-- Keep the UI compact, clear, and work-focused.
-- Do not replace manual inputs with product import; product import is an optional helper.
-- Product status filter defaults to `Продаются и готовые`.
-- The millimeter update notice is controlled by `ozon-mm-notice-v1` in `localStorage` with a cookie fallback.
+- Keep UI Russian.
+- Keep UI compact, clear, work-focused, and responsive.
+- Prefer existing patterns over new dependencies.
+- Do not add backend, account scraping, API keys, or automatic Ozon login unless explicitly requested.
+- Do not change the logistics page when working only on unit-economics features.
+- Add focused tests for parsing, range matching, fallback behavior, and manual override behavior.
