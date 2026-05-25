@@ -12,6 +12,10 @@ import {
   PRODUCT_STATUS_FILTERS,
 } from "./products.js";
 import {
+  findCommissionRate,
+  parseCommissionRateSheets,
+} from "./commissionRates.js";
+import {
   calculateUnitEconomics,
   LOGISTICS_MODES,
   makeEmptyUnitEconomicsInputs,
@@ -44,6 +48,7 @@ const OZON_REPORTS_URL = "https://docs.ozon.com/global/en/accounting/reporting-d
 const MM_NOTICE_KEY = "ozon-mm-notice-v1";
 const PRODUCT_IMPORT_NOTICE_KEY = "ozon-product-import-notice-v1";
 const UNIT_ECONOMICS_NOTICE_KEY = "ozon-unit-economics-notice-v1";
+const COMMISSION_IMPORT_NOTICE_KEY = "ozon-commission-import-notice-v1";
 const UNIT_ECONOMICS_DRAFT_KEY = "ozon-unit-economics-draft-v1";
 
 function noticeCookie(key) {
@@ -132,6 +137,11 @@ function formatInputRuble(value) {
   return amount === null ? "—" : formatRuble(amount);
 }
 
+function formatInputPercent(value) {
+  const percent = parseProductPrice(value);
+  return percent === null ? "—" : `${numberFormatter.format(percent)} %`;
+}
+
 function StatCard({ label, value }) {
   return (
     <div className="stat-card">
@@ -169,9 +179,15 @@ function Field({ label, value, onChange, placeholder, suffix }) {
 }
 
 function UnitEconomicsPage({
+  commissionFileName,
+  commissionLookup,
+  commissionSource,
+  commissionStatus,
   unitInputs,
   unitContext,
+  onApplyCommissionRate,
   onBackToLogistics,
+  onCommissionFileChange,
   onOpenGuide,
   onInputChange,
   onLogisticsModeChange,
@@ -237,9 +253,34 @@ function UnitEconomicsPage({
 
       <section className="unit-grid">
         <div className="panel unit-form-panel">
-          <div className="panel-heading">
-            <Icon symbol="₽" />
-            <h2>Доход и расходы</h2>
+          <div className="panel-heading panel-heading-spread">
+            <div className="panel-title-row">
+              <Icon symbol="₽" />
+              <h2>Доход и расходы</h2>
+            </div>
+            <label className="ghost-upload-button" title="Загрузить XLSX с таблицей вознаграждения">
+              <Icon symbol="↑" />
+              <span>Загрузить комиссии Ozon</span>
+              <input accept=".xlsx,.xls" onChange={onCommissionFileChange} type="file" />
+            </label>
+          </div>
+
+          <div className="commission-status-box">
+            <div className={`notice ${commissionStatus.tone}`}>
+              <Icon symbol={commissionStatus.tone === "success" ? "✓" : commissionStatus.tone === "danger" ? "!" : "i"} />
+              <span>{commissionStatus.text}</span>
+            </div>
+            {commissionFileName ? <p className="file-name">Файл комиссий: {commissionFileName}</p> : null}
+            <div className={`notice ${commissionSource.tone}`}>
+              <Icon symbol={commissionSource.tone === "success" ? "✓" : commissionSource.tone === "danger" ? "!" : "i"} />
+              <span>{commissionSource.text}</span>
+            </div>
+            {commissionLookup.status === "found" && commissionSource.source !== "ozon-table" ? (
+              <button className="ghost-button compact-button" onClick={onApplyCommissionRate} type="button">
+                <Icon symbol="↻" />
+                <span>Подставить {formatInputPercent(commissionLookup.ratePercent)}</span>
+              </button>
+            ) : null}
           </div>
 
           <div className="form-grid unit-form-grid">
@@ -458,6 +499,14 @@ function UnitEconomicsGuidePage({ onBackToUnitEconomics }) {
                 Это важно, чтобы не перепутать автоматические и ручные значения.
               </p>
             </div>
+            <div>
+              <strong>Комиссия Ozon</strong>
+              <p>
+                Если загрузить официальную таблицу категорий для расчёта вознаграждения, калькулятор попробует найти
+                ставку FBS по точному совпадению категории и типа товара. Если совпадение не найдено, комиссия остаётся
+                ручной.
+              </p>
+            </div>
           </div>
         </section>
 
@@ -480,8 +529,13 @@ function UnitEconomicsGuidePage({ onBackToUnitEconomics }) {
                 </tr>
                 <tr>
                   <td>Комиссия Ozon</td>
-                  <td>Процент вознаграждения за продажу товара по категории и схеме работы.</td>
-                  <td>В актуальном разделе комиссий Ozon или в позаказном отчёте по уже доставленным заказам.</td>
+                  <td>
+                    Процент вознаграждения за продажу товара по категории, типу товара, схеме FBS и ценовому диапазону.
+                  </td>
+                  <td>
+                    В официальной таблице категорий для расчёта вознаграждения Ozon или в позаказном отчёте по уже
+                    доставленным заказам.
+                  </td>
                 </tr>
                 <tr>
                   <td>Эквайринг</td>
@@ -589,10 +643,12 @@ export default function App() {
   const [inputs, setInputs] = useState(initialInputs);
   const [parsed, setParsed] = useState(null);
   const [productReport, setProductReport] = useState(null);
+  const [commissionRates, setCommissionRates] = useState(null);
   const [page, setPage] = useState(getInitialPage);
   const [selectedCluster, setSelectedCluster] = useState("");
   const [fileName, setFileName] = useState("");
   const [productFileName, setProductFileName] = useState("");
+  const [commissionFileName, setCommissionFileName] = useState("");
   const [selectedProductKey, setSelectedProductKey] = useState("");
   const [productStatusFilter, setProductStatusFilter] = useState(PRODUCT_STATUS_FILTERS.ACTIVE);
   const [showMillimeterNotice, setShowMillimeterNotice] = useState(() => shouldShowNotice(MM_NOTICE_KEY));
@@ -601,6 +657,9 @@ export default function App() {
   );
   const [showUnitEconomicsNotice, setShowUnitEconomicsNotice] = useState(() =>
     shouldShowNotice(UNIT_ECONOMICS_NOTICE_KEY),
+  );
+  const [showCommissionImportNotice, setShowCommissionImportNotice] = useState(() =>
+    shouldShowNotice(COMMISSION_IMPORT_NOTICE_KEY),
   );
   const [unitInputs, setUnitInputs] = useState(() => ({
     ...makeEmptyUnitEconomicsInputs(),
@@ -615,6 +674,11 @@ export default function App() {
     tone: "muted",
     text: "Отчёт товаров можно загрузить позже, ручной ввод уже доступен.",
   });
+  const [commissionStatus, setCommissionStatus] = useState({
+    tone: "muted",
+    text: "Таблицу вознаграждения можно загрузить позже, ручной ввод комиссии уже доступен.",
+  });
+  const [commissionWasEditedManually, setCommissionWasEditedManually] = useState(false);
   const [showAll, setShowAll] = useState(false);
 
   const products = productReport?.products ?? [];
@@ -651,6 +715,62 @@ export default function App() {
       : productPrice <= 300
         ? "Для товаров до 300 руб."
         : "Для товаров свыше 300 руб.";
+  const commissionLookup = useMemo(
+    () =>
+      findCommissionRate({
+        commissionRates,
+        category: unitContext.category,
+        productType: unitContext.productType,
+        productPrice: unitInputs.salePrice,
+      }),
+    [commissionRates, unitContext.category, unitContext.productType, unitInputs.salePrice],
+  );
+  const commissionSource = useMemo(() => {
+    if (commissionWasEditedManually) {
+      return {
+        source: "manual",
+        tone: "muted",
+        text:
+          commissionLookup.status === "found"
+            ? `Комиссия введена вручную. Можно подставить ставку из таблицы Ozon: ${numberFormatter.format(
+                commissionLookup.ratePercent,
+              )} %.`
+            : "Комиссия введена вручную.",
+      };
+    }
+
+    if (commissionLookup.status === "found") {
+      return {
+        source: "ozon-table",
+        tone: "success",
+        text: `${commissionLookup.message} Строка ${commissionLookup.sourceRow}, ставка ${numberFormatter.format(
+          commissionLookup.ratePercent,
+        )} %.`,
+      };
+    }
+
+    if (commissionLookup.status === "missing-file") {
+      return {
+        source: "missing-file",
+        tone: "muted",
+        text: commissionLookup.message,
+      };
+    }
+
+    if (commissionLookup.status === "ambiguous") {
+      return {
+        source: "ambiguous",
+        tone: "danger",
+        text: commissionLookup.message,
+      };
+    }
+
+    return {
+      source: "not-found",
+      tone: "warning",
+      text: commissionLookup.message,
+    };
+  }, [commissionLookup, commissionWasEditedManually]);
 
   useEffect(() => {
     function handlePopState() {
@@ -664,6 +784,22 @@ export default function App() {
   useEffect(() => {
     saveUnitEconomicsDraft({ inputs: unitInputs, context: unitContext });
   }, [unitContext, unitInputs]);
+
+  useEffect(() => {
+    if (commissionWasEditedManually || commissionLookup.status !== "found") {
+      return;
+    }
+
+    const nextCommission = String(Number(commissionLookup.ratePercent.toFixed(4)));
+    setUnitInputs((current) =>
+      current.commissionPercent === nextCommission
+        ? current
+        : {
+            ...current,
+            commissionPercent: nextCommission,
+          },
+    );
+  }, [commissionLookup, commissionWasEditedManually]);
 
   function navigateTo(nextPage) {
     const path =
@@ -702,6 +838,7 @@ export default function App() {
         article: selectedProduct?.article ?? "",
         sku: selectedProduct?.sku ?? "",
         category: selectedProduct?.category ?? "",
+        productType: selectedProduct?.type ?? "",
         source: selectedProduct ? "Товар из отчёта Ozon" : "Из расчёта логистики",
         sourceCluster: selectedCluster,
         volume,
@@ -727,10 +864,26 @@ export default function App() {
   }
 
   function updateUnitInput(name, value) {
+    if (name === "commissionPercent") {
+      setCommissionWasEditedManually(true);
+    }
+
     setUnitInputs((current) => ({
       ...current,
       [name]: value,
       ...(name === "logistics" ? { logisticsMode: LOGISTICS_MODES.MANUAL } : {}),
+    }));
+  }
+
+  function applyCommissionRateFromTable() {
+    if (commissionLookup.status !== "found") {
+      return;
+    }
+
+    setCommissionWasEditedManually(false);
+    setUnitInputs((current) => ({
+      ...current,
+      commissionPercent: String(Number(commissionLookup.ratePercent.toFixed(4))),
     }));
   }
 
@@ -761,6 +914,11 @@ export default function App() {
   function closeUnitEconomicsNotice() {
     rememberNotice(UNIT_ECONOMICS_NOTICE_KEY);
     setShowUnitEconomicsNotice(false);
+  }
+
+  function closeCommissionImportNotice() {
+    rememberNotice(COMMISSION_IMPORT_NOTICE_KEY);
+    setShowCommissionImportNotice(false);
   }
 
   function resetSelectedProduct() {
@@ -835,6 +993,40 @@ export default function App() {
     }
   }
 
+  async function handleCommissionFileChange(event) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    setCommissionFileName(file.name);
+    setCommissionWasEditedManually(false);
+    setCommissionStatus({ tone: "muted", text: "Читаю таблицу вознаграждения в браузере..." });
+
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { type: "array" });
+      const sheetsByName = readWorkbookSheets(workbook);
+      const nextRates = parseCommissionRateSheets(sheetsByName);
+
+      setCommissionRates(nextRates);
+      setCommissionStatus({
+        tone: "success",
+        text: `Таблица загружена: ${nextRates.meta.count.toLocaleString("ru-RU")} ставок FBS${
+          nextRates.meta.duplicateCount ? `, дублей: ${nextRates.meta.duplicateCount.toLocaleString("ru-RU")}` : ""
+        }.`,
+      });
+    } catch (error) {
+      setCommissionRates(null);
+      setCommissionStatus({
+        tone: "danger",
+        text: error instanceof Error ? error.message : "Не удалось прочитать таблицу вознаграждения.",
+      });
+    } finally {
+      event.target.value = "";
+    }
+  }
+
   const visibleRows = result.status === "ok" ? result.rows : [];
 
   return (
@@ -899,11 +1091,38 @@ export default function App() {
           </section>
         </div>
       ) : null}
+      {!showMillimeterNotice && !showProductImportNotice && !showUnitEconomicsNotice && showCommissionImportNotice ? (
+        <div className="modal-backdrop" role="presentation">
+          <section
+            aria-describedby="commission-import-notice-text"
+            aria-labelledby="commission-import-notice-title"
+            className="update-modal"
+            role="dialog"
+          >
+            <p className="modal-kicker">Новое обновление</p>
+            <h2 id="commission-import-notice-title">Комиссия Ozon теперь может подставляться из таблицы</h2>
+            <p id="commission-import-notice-text">
+              На странице юнит-экономики можно загрузить официальную таблицу категорий для расчёта вознаграждения.
+              Калькулятор найдёт ставку FBS по категории, типу товара и цене. Если совпадение не найдено, ручной ввод
+              комиссии остаётся на месте.
+            </p>
+            <button className="modal-button" onClick={closeCommissionImportNotice} type="button">
+              Понятно
+            </button>
+          </section>
+        </div>
+      ) : null}
       {page === "unit-economics-guide" ? (
         <UnitEconomicsGuidePage onBackToUnitEconomics={goToUnitEconomics} />
       ) : page === "unit-economics" ? (
         <UnitEconomicsPage
+          commissionFileName={commissionFileName}
+          commissionLookup={commissionLookup}
+          commissionSource={commissionSource}
+          commissionStatus={commissionStatus}
+          onApplyCommissionRate={applyCommissionRateFromTable}
           onBackToLogistics={goToLogistics}
+          onCommissionFileChange={handleCommissionFileChange}
           onOpenGuide={goToUnitEconomicsGuide}
           onInputChange={updateUnitInput}
           onLogisticsModeChange={updateUnitLogisticsMode}

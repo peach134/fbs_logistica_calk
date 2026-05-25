@@ -257,6 +257,13 @@ h2 {
   margin-bottom: 2px;
 }
 
+.panel-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--green);
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -608,6 +615,20 @@ tr:last-child td {
 
 .unit-form-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.commission-status-box {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.commission-status-box .file-name {
+  margin-top: 0;
+}
+
+.commission-status-box .notice.warning {
+  margin-bottom: 0;
 }
 
 .logistics-choice {

@@ -7,7 +7,7 @@
     "dev": "vite --configLoader native",
     "build": "vite build --configLoader native",
     "preview": "vite preview",
-    "test:logic": "node --test src/tariffs.test.mjs src/products.test.mjs src/unitEconomics.test.mjs"
+    "test:logic": "node --test src/tariffs.test.mjs src/products.test.mjs src/unitEconomics.test.mjs src/commissionRates.test.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.0.0",
